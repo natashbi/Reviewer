@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Server at Client: Step by Step</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62.5..125,400..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#EEF2F6;--header-bg:rgba(238,242,246,0.94);--surface:#FFFFFF;--surface-2:#E3E9EF;
+  --ink:#132230;--muted:#4F6175;--line:#CCD6DF;--line-strong:#9FB0C0;
+  --blue:#1B5DA6;--blue-ink:#164C88;--blue-soft:#DCE9F7;--on-blue:#FFFFFF;
+  --yellow:#E2AC1D;--yellow-ink:#765600;--yellow-soft:#FBF0CD;
+  --green:#2A8352;--green-ink:#1D643E;--green-soft:#DAEFE2;
+  --red:#C2443C;--red-ink:#9A2F29;--red-soft:#F8DFDC;
+  --packet-ink:#1A1400;--dot:rgba(19,34,48,0.11);
+  --font-head:"Archivo","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-body:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1720;--header-bg:rgba(14,23,32,0.94);--surface:#15212C;--surface-2:#1C2A37;
+    --ink:#E3EBF2;--muted:#9BADBE;--line:#2A3B4B;--line-strong:#4A5F73;
+    --blue:#6FA8E6;--blue-ink:#A0C6F0;--blue-soft:#1A3048;--on-blue:#0E1720;
+    --yellow:#F0C64A;--yellow-ink:#F3D57D;--yellow-soft:#362D12;
+    --green:#5CC08A;--green-ink:#8BD8AE;--green-soft:#16332A;
+    --red:#EE7A70;--red-ink:#F5A69E;--red-soft:#3B1F1D;
+    --packet-ink:#1A1400;--dot:rgba(227,235,242,0.08);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1720;--header-bg:rgba(14,23,32,0.94);--surface:#15212C;--surface-2:#1C2A37;
+  --ink:#E3EBF2;--muted:#9BADBE;--line:#2A3B4B;--line-strong:#4A5F73;
+  --blue:#6FA8E6;--blue-ink:#A0C6F0;--blue-soft:#1A3048;--on-blue:#0E1720;
+  --yellow:#F0C64A;--yellow-ink:#F3D57D;--yellow-soft:#362D12;
+  --green:#5CC08A;--green-ink:#8BD8AE;--green-soft:#16332A;
+  --red:#EE7A70;--red-ink:#F5A69E;--red-soft:#3B1F1D;
+  --packet-ink:#1A1400;--dot:rgba(227,235,242,0.08);
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--bg);scroll-behavior:smooth;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 76px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:1040px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:10px 16px}
+.brand{font-family:var(--font-head);font-stretch:112%;font-weight:750;font-size:15px;white-space:nowrap;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:8px}
+.cable-tag{flex:none;display:inline-block;width:26px;height:6px;border-radius:3px;background:var(--c,var(--blue))}
+.chips{position:relative;flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;font-size:14px;line-height:1;padding:9px 12px;border-radius:999px;color:var(--muted);text-decoration:none;border:1px solid transparent}
+.chip:hover{color:var(--ink);border-color:var(--line)}
+.chip[aria-current="true"]{background:var(--blue-soft);color:var(--blue-ink)}
+
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+section{padding:56px 0 8px}
+h1,h2,h3{font-family:var(--font-head);line-height:1.15;margin:0;color:var(--ink)}
+h1{font-size:clamp(2.1rem,7vw,3.3rem);font-stretch:116%;font-weight:780;letter-spacing:-0.01em;margin-bottom:14px}
+h2{font-size:clamp(1.55rem,4.4vw,2.05rem);font-stretch:112%;font-weight:720;margin-bottom:12px}
+h3{font-size:1.15rem;font-weight:700;font-stretch:104%}
+p{margin:0 0 14px}
+.lead{font-size:1.1rem;color:var(--muted);max-width:62ch}
+code{font-family:var(--font-mono);font-size:0.88em;background:var(--surface-2);padding:1px 6px;border-radius:5px;white-space:nowrap}
+a{color:var(--blue-ink)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.muted{color:var(--muted)}
+
+.hero{padding-top:36px}
+.board{margin-top:22px;background-color:var(--surface);background-image:radial-gradient(var(--dot) 1.2px,transparent 1.4px);background-size:18px 18px;border:1px solid var(--line);border-radius:18px;padding:14px 14px 18px}
+.board-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+.seg button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line-strong)}
+.flow-count{font-size:14px;color:var(--muted)}
+.diagram{display:block;width:100%;max-width:560px;height:auto;margin:0 auto}
+.flow-caption{min-height:5.4em;margin:6px 4px 12px;font-size:1.06rem}
+.flow-caption p{margin:0}
+.controls{display:flex;gap:10px;justify-content:flex-end}
+.btn{font:inherit;font-size:15px;font-weight:700;border-radius:10px;padding:10px 18px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-primary{background:var(--blue);border-color:var(--blue);color:var(--on-blue)}
+
+.node rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5;transition:fill .3s,stroke .3s}
+.node.is-active rect{fill:var(--blue-soft);stroke:var(--blue);stroke-width:2.5}
+.node.is-ok rect{fill:var(--green-soft);stroke:var(--green);stroke-width:2.5}
+.node.is-error rect{fill:var(--red-soft);stroke:var(--red);stroke-width:2.5}
+.svg-title{fill:var(--ink);font-family:var(--font-head);font-weight:700;font-size:19px}
+.svg-sub{fill:var(--muted);font-family:var(--font-body);font-size:14px}
+.svg-mono{fill:var(--blue-ink);font-family:var(--font-mono);font-size:14px}
+.svg-small{fill:var(--muted);font-family:var(--font-body);font-size:13px}
+.narrow-only{display:none}
+.cable{stroke:var(--blue);stroke-width:6;stroke-linecap:round;fill:none}
+.wire{stroke:var(--line-strong);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.wire-bad{stroke:var(--red);stroke-dasharray:7 6}
+.fade{transition:opacity .35s,visibility .35s}
+.is-hidden{opacity:0;visibility:hidden}
+.dim{opacity:.3}
+.host-box{fill:none;stroke:var(--line-strong);stroke-width:1.5;stroke-dasharray:6 6}
+.x-mark{stroke:var(--red);stroke-width:3;stroke-linecap:round}
+.packet{transition:transform .75s cubic-bezier(.4,0,.2,1),opacity .3s}
+.packet.no-anim{transition:none}
+.packet circle{fill:var(--yellow);stroke:var(--packet-ink);stroke-width:1.5}
+.packet-icon{fill:var(--packet-ink);font-family:var(--font-head);font-weight:800;font-size:14px}
+@media (prefers-reduced-motion: reduce){.packet,.node rect,.fade{transition:none}}
+@media (max-width:560px){
+  .wrap{padding:0 14px}
+  .board,.panel{padding:10px 8px 14px}
+  .svg-title{font-size:23px}
+  .svg-sub,.svg-mono{font-size:18px}
+  .svg-small{font-size:17px}
+  .packet-icon{font-size:16px}
+  .wide-only{display:none}
+  .narrow-only{display:inline}
+}
+
+.rows{border-top:1px solid var(--line);margin:18px 0}
+.row{display:grid;grid-template-columns:minmax(0,11rem) minmax(0,1fr);gap:6px 20px;padding:16px 0;border-bottom:1px solid var(--line)}
+.row-term{font-family:var(--font-head);font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:10px}
+.row-body p{margin:0 0 6px}
+.lab-note{color:var(--muted);font-size:15px}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+.compare > div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.compare .is-domain{border-color:var(--blue);background:var(--blue-soft)}
+.compare h3{margin-bottom:8px}
+.compare ul{margin:0;padding-left:1.1em}
+.compare li{margin-bottom:4px}
+@media (max-width:600px){.row{grid-template-columns:1fr}.compare{grid-template-columns:1fr}}
+
+.search{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);margin:6px 0 4px}
+.term-group h3{margin:26px 0 2px;color:var(--muted);font-size:1rem}
+.term-list{margin:0}
+.term{padding:12px 0;border-bottom:1px solid var(--line)}
+.term dt{font-weight:700}
+.term dd{margin:2px 0 0}
+.term .lab-note{display:block;margin-top:3px}
+.empty{color:var(--muted);padding:14px 0;display:none}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 14px 16px}
+.mode-text{margin:4px 6px 0}
+.mode-text h3{margin:6px 0}
+.note{font-size:15px;color:var(--muted);margin-top:12px}
+
+.progress-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px;color:var(--muted);flex-wrap:wrap}
+.progress{position:relative;height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden;margin:8px 0 6px}
+.progress span{position:absolute;inset:0 auto 0 0;width:0;background:var(--green);border-radius:999px;transition:width .3s}
+.linkbtn{font:inherit;font-size:14px;background:none;border:0;color:var(--blue-ink);text-decoration:underline;cursor:pointer;padding:4px}
+.helper{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:18px 0}
+.helper label{font-weight:700;display:block;margin-bottom:8px}
+.helper select{font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);max-width:100%}
+.ram-out{margin:12px 0 0;padding:10px 12px;border-radius:10px;display:none}
+.ram-out.ok{display:block;background:var(--green-soft);color:var(--green-ink)}
+.ram-out.warn{display:block;background:var(--yellow-soft);color:var(--yellow-ink)}
+.ram-out.bad{display:block;background:var(--red-soft);color:var(--red-ink)}
+.table-wrap{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:480px;font-size:15.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--font-head);font-weight:700;background:var(--surface-2)}
+td.mono{font-family:var(--font-mono);font-size:14.5px}
+.phase{margin-top:34px}
+.phase-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px}
+.phase-time{color:var(--muted);font-size:14px;white-space:nowrap}
+.steps{list-style:none;margin:0;padding:0}
+.step{display:grid;grid-template-columns:26px minmax(0,1fr);gap:4px 12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.step input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--green);cursor:pointer}
+.step label{cursor:pointer}
+.step input:checked + label{color:var(--muted)}
+.why{grid-column:2}
+.why summary{cursor:pointer;color:var(--yellow-ink);font-weight:700;font-size:14.5px;width:max-content}
+.why p{margin:8px 0 2px;padding-left:12px;border-left:3px solid var(--yellow);font-size:15.5px}
+.checkpoint{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px 14px;background:var(--green-soft);color:var(--green-ink);border-radius:12px;font-size:15.5px}
+.checkpoint strong{white-space:nowrap}
+
+.fix{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:14px 0;background:var(--surface)}
+.fix > div{padding:14px 16px}
+.fix .said{border-right:1px solid var(--line)}
+.fix .label{font-size:13.5px;font-weight:700;margin-bottom:4px}
+.fix .said .label{color:var(--red-ink)}
+.fix .right .label{color:var(--green-ink)}
+.fix p{margin:0}
+.src{display:block;font-size:13px;color:var(--muted);margin-bottom:2px}
+.aside{border-left:4px solid var(--yellow);padding:12px 14px;background:var(--yellow-soft);margin:18px 0}
+.aside p:last-child{margin-bottom:0}
+@media (max-width:600px){.fix{grid-template-columns:1fr}.fix .said{border-right:0;border-bottom:1px solid var(--line)}}
+
+.err{border-bottom:1px solid var(--line)}
+.err:first-of-type{border-top:1px solid var(--line)}
+.err summary{cursor:pointer;padding:14px 0;font-weight:700;list-style:none;display:flex;gap:10px;align-items:flex-start}
+.err summary::-webkit-details-marker{display:none}
+.err summary::before{content:"+";font-family:var(--font-mono);color:var(--red);font-weight:700;width:1em;flex:none}
+.err[open] summary::before{content:"−"}
+.err .body{padding:0 0 14px 1.6em}
+.err .body p{margin:0 0 6px}
+
+.q{margin:22px 0;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.q-title{font-weight:700;margin-bottom:10px;display:flex;gap:10px}
+.q-num{font-family:var(--font-head);color:var(--blue-ink);flex:none}
+.opts{display:grid;gap:8px}
+.opt{font:inherit;text-align:left;padding:11px 14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--blue)}
+.opt:disabled{cursor:default;opacity:.75}
+.opt.is-right{background:var(--green-soft);border-color:var(--green);color:var(--green-ink);opacity:1}
+.opt.is-wrong{background:var(--red-soft);border-color:var(--red);color:var(--red-ink);opacity:1}
+.q-feedback{margin:10px 0 0;font-size:15.5px}
+.q-feedback.good{color:var(--green-ink)}
+.q-feedback.bad{color:var(--red-ink)}
+.score-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px}
+.score{font-family:var(--font-head);font-weight:700;font-size:1.1rem;margin:0}
+
+.rules{list-style:none;padding:0;margin:14px 0;border-top:1px solid var(--line)}
+.rules li{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);font-size:1.05rem}
+
+.click-tools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 6px}
+.click-part{border:1px solid var(--line);border-radius:14px;background:var(--surface);margin:12px 0}
+.click-part > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:14px 16px;font-family:var(--font-head);font-weight:700;font-size:1.05rem;line-height:1.3}
+.click-part > summary::-webkit-details-marker{display:none}
+.click-part > summary::after{content:"+";margin-left:auto;font-family:var(--font-mono);color:var(--blue-ink);font-size:1.2rem}
+.click-part[open] > summary::after{content:"−"}
+.click-letter{flex:none;display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--blue-soft);color:var(--blue-ink);font-size:15px}
+.click-body{padding:0 16px 12px}
+.click-list{margin:0;padding-left:1.5em}
+.click-list > li{padding:8px 0 8px 4px;border-bottom:1px solid var(--line)}
+.click-list > li:last-child{border-bottom:0}
+.click-list ul{margin:6px 0 0;padding-left:1.1em}
+.click-list ul li{margin:5px 0}
+.where{color:var(--muted);font-size:0.92em}
+@media (max-width:560px){.click-body{padding:0 12px 10px}.click-part > summary{padding:12px}}
+footer{margin-top:56px;padding:24px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:14.5px}
+footer ul{padding-left:1.1em;margin:8px 0}
+
+.sec{padding:40px 0 4px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:2px}
+.sec-head h2{margin:0;font-size:clamp(1.3rem,4vw,1.6rem)}
+.sec-count{font-family:var(--font-head);font-weight:700;color:var(--muted);white-space:nowrap;font-size:15px}
+.sec-count.done{color:var(--green-ink)}
+.step.flash{background:var(--yellow-soft);transition:background .6s}
+.values td:first-child{font-weight:700}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.err-box{margin-top:12px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#top"><span class="cable-tag" aria-hidden="true"></span>Server at Client</a>
+    <nav class="chips" id="chips" aria-label="Mga section">
+      <a class="chip" href="#s0">Bago magsimula</a>
+      <a class="chip" href="#sA">A Server VM</a>
+      <a class="chip" href="#sB">B Install</a>
+      <a class="chip" href="#sC">C Network</a>
+      <a class="chip" href="#sD">D IP</a>
+      <a class="chip" href="#sE">E Domain</a>
+      <a class="chip" href="#sF">F User</a>
+      <a class="chip" href="#sG">G Client</a>
+      <a class="chip" href="#sH">H Client IP</a>
+      <a class="chip" href="#sI">I Join</a>
+      <a class="chip" href="#sJ">J Client 2</a>
+      <a class="chip" href="#sErr">Errors</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section class="hero" id="top">
+  <h1>Server at Client: Step by Step</h1>
+  <p class="lead">I-check ang bawat step kapag tapos na. Nasa panaklong kung saan banda ito sa screen. Naka-save ang progress sa device na ito.</p>
+  <div class="progress-row"><span id="progressLabel">0 tapos na</span><button type="button" class="linkbtn" id="progressReset">I-reset</button></div>
+  <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+  <div class="toolbar"><button type="button" class="btn btn-primary" id="nextStep">Ituloy sa susunod na step</button></div>
+
+  <h3 style="margin-top:22px">Mga ilalagay</h3>
+  <div class="table-wrap">
+    <table class="values">
+      <thead><tr><th scope="col"></th><th scope="col">Server</th><th scope="col">Client 1</th><th scope="col">Client 2</th></tr></thead>
+      <tbody>
+        <tr><td>Pangalan</td><td class="mono">WinServer</td><td class="mono">Win11Client</td><td class="mono">Win11Client2</td></tr>
+        <tr><td>IP address</td><td class="mono">192.168.10.10</td><td class="mono">192.168.10.20</td><td class="mono">192.168.10.21</td></tr>
+        <tr><td>Subnet mask</td><td class="mono">255.255.255.0</td><td class="mono">255.255.255.0</td><td class="mono">255.255.255.0</td></tr>
+        <tr><td>Default gateway</td><td>blangko</td><td>blangko</td><td>blangko</td></tr>
+        <tr><td>Preferred DNS</td><td class="mono">127.0.0.1</td><td class="mono">192.168.10.10</td><td class="mono">192.168.10.10</td></tr>
+        <tr><td>Network</td><td class="mono">intnet</td><td class="mono">intnet</td><td class="mono">intnet</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table class="values">
+      <tbody>
+        <tr><td>Domain</td><td class="mono">ktg.local</td></tr>
+        <tr><td>Domain user</td><td class="mono">KTG\kindson</td></tr>
+        <tr><td>Isulat sa papel</td><td>Administrator password, DSRM password, password ni kindson</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="sec" id="s0" data-sec>
+  <div class="sec-head"><h2>Bago magsimula</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="z1"><label for="z1">Kopyahin sa USB na naka-exFAT o NTFS: VirtualBox installer, Windows Server 2019 ISO, at Windows 11 ISO.</label></li>
+    <li class="step"><input type="checkbox" id="z2"><label for="z2">Sa lab PC: <strong>Ctrl + Shift + Esc</strong> → <strong>Performance</strong> → <strong>CPU</strong>. Dapat “Virtualization: Enabled” <span class="where">(ilalim ng graph)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="z3"><label for="z3">Sa <strong>Memory</strong>, tingnan ang total na RAM <span class="where">(taas, kanan)</span>. Dapat 8 GB pataas.</label></li>
+    <li class="step"><input type="checkbox" id="z4"><label for="z4">Kung wala pang VirtualBox: double-click ang installer sa USB → <strong>Next</strong> hanggang <strong>Install</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="z5"><label for="z5">Kopyahin ang mga ISO mula sa USB papunta sa lab PC.</label></li>
+    <li class="step"><input type="checkbox" id="z6"><label for="z6">Huwag i-restart ang lab PC hanggang matapos ang activity.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sA" data-sec>
+  <div class="sec-head"><h2>A. Gumawa ng server VM</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="a1"><label for="a1">Sa VirtualBox, i-click ang asul na <strong>New</strong> <span class="where">(taas)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="a2"><label for="a2">Name: <code>WinServer</code>.</label></li>
+    <li class="step"><input type="checkbox" id="a3"><label for="a3">ISO Image <span class="where">(dropdown sa ilalim ng Name)</span> → <strong>Other</strong> → piliin ang Server ISO → <strong>Open</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="a4"><label for="a4">I-check ang <strong>Skip Unattended Installation</strong> <span class="where">(ilalim ng ISO Image)</span> → <strong>Next</strong> <span class="where">(baba, kanan)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="a5"><label for="a5">Base Memory: 2048 MB → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="a6"><label for="a6">Hard disk: 50 GB → <strong>Next</strong> → <strong>Finish</strong>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sB" data-sec>
+  <div class="sec-head"><h2>B. I-install ang Windows Server</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="b1"><label for="b1">Piliin ang WinServer <span class="where">(listahan sa kaliwa)</span> → berdeng <strong>Start</strong> <span class="where">(taas)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="b2"><label for="b2">Language screen → <strong>Next</strong> <span class="where">(baba, kanan)</span> → <strong>Install now</strong> <span class="where">(gitna)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="b3"><label for="b3">Piliin ang pangalawa: <strong>Windows Server 2019 Standard Evaluation (Desktop Experience)</strong> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="b4"><label for="b4">I-check ang <strong>I accept the license terms</strong> <span class="where">(baba ng text, kaliwa)</span> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="b5"><label for="b5">I-click ang <strong>Custom: Install Windows only (advanced)</strong> <span class="where">(pangalawang option)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="b6"><label for="b6"><strong>Drive 0 Unallocated Space</strong> → <strong>Next</strong>. Hintayin, kusa itong magre-restart.</label></li>
+    <li class="step"><input type="checkbox" id="b7"><label for="b7">Customize settings: password sa dalawang field → <strong>Finish</strong> <span class="where">(baba, kanan)</span>. Isulat ang password.</label></li>
+    <li class="step"><input type="checkbox" id="b8"><label for="b8">Lock screen: <strong>Right Ctrl + Delete</strong> → password → Enter.</label></li>
+    <li class="step"><input type="checkbox" id="b9"><label for="b9">Kung may popup tungkol sa Windows Admin Center: <strong>X</strong> <span class="where">(taas, kanan ng popup)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="b10"><label for="b10"><strong>Devices</strong> <span class="where">(menu sa pinakataas ng VM window)</span> → <strong>Insert Guest Additions CD image</strong> <span class="where">(bandang baba ng menu)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="b11"><label for="b11">File Explorer <span class="where">(folder icon sa taskbar)</span> → <strong>This PC</strong> → <strong>CD Drive (D:)</strong> → double-click <strong>VBoxWindowsAdditions</strong> → Next → Next → Install → <strong>Reboot now</strong> → <strong>Finish</strong>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sC" data-sec>
+  <div class="sec-head"><h2>C. Internal Network ng server</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="c1"><label for="c1">Start <span class="where">(baba, kaliwa)</span> → Power → <strong>Shut down</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="c2"><label for="c2">Sa VirtualBox: piliin ang WinServer → orange na <strong>Settings</strong> <span class="where">(taas)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="c3"><label for="c3"><strong>Network</strong> <span class="where">(kaliwang listahan)</span> → tab na <strong>Adapter 1</strong> → Attached to: <strong>Internal Network</strong> → Name: <code>intnet</code> → <strong>OK</strong> <span class="where">(baba, kanan)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="c4"><label for="c4"><strong>Start</strong> ulit ang WinServer, tapos mag-login.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sD" data-sec>
+  <div class="sec-head"><h2>D. IP at firewall ng server</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="d1"><label for="d1"><strong>Windows key + R</strong> → i-type ang <code>ncpa.cpl</code> → <strong>OK</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="d2"><label for="d2">Right-click <strong>Ethernet</strong> → <strong>Properties</strong> <span class="where">(pinakababa ng menu)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="d3"><label for="d3">I-click ang salitang <strong>Internet Protocol Version 4 (TCP/IPv4)</strong>, hindi ang checkbox → <strong>Properties</strong> <span class="where">(ilalim ng listahan, kanan)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="d4"><label for="d4"><strong>Use the following IP address</strong> → IP address: <code>192.168.10.10</code> → i-click ang Subnet mask para lumabas ang <code>255.255.255.0</code> → blangko ang Default gateway.</label></li>
+    <li class="step"><input type="checkbox" id="d5"><label for="d5">Preferred DNS server <span class="where">(ibabang bahagi)</span>: <code>127.0.0.1</code> → <strong>OK</strong> → <strong>Close</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="d6"><label for="d6"><strong>Windows key + R</strong> → <code>firewall.cpl</code> → <strong>OK</strong> → <strong>Turn Windows Defender Firewall on or off</strong> <span class="where">(kaliwang gilid)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="d7"><label for="d7"><strong>Turn off</strong> sa tatlong section → <strong>OK</strong>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sE" data-sec>
+  <div class="sec-head"><h2>E. Gawing domain controller</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="e1"><label for="e1">Server Manager → <strong>Manage</strong> <span class="where">(kanang taas)</span> → <strong>Add Roles and Features</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="e2"><label for="e2"><strong>Next</strong> nang tatlong beses.</label></li>
+    <li class="step"><input type="checkbox" id="e3"><label for="e3">I-check ang <strong>Active Directory Domain Services</strong> <span class="where">(pangalawa sa listahan)</span> → <strong>Add Features</strong> <span class="where">(popup)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="e4"><label for="e4"><strong>Next</strong> → <strong>Next</strong> → <strong>Install</strong> <span class="where">(baba)</span>. Hintayin matapos.</label></li>
+    <li class="step"><input type="checkbox" id="e5"><label for="e5"><strong>Promote this server to a domain controller</strong> <span class="where">(asul na link sa resulta, o sa flag sa kanang taas ng Server Manager)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="e6"><label for="e6"><strong>Add a new forest</strong> <span class="where">(pangatlong option)</span> → Root domain name: <code>ktg.local</code> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="e7"><label for="e7">DSRM password sa dalawang field → <strong>Next</strong>. Isulat ang password.</label></li>
+    <li class="step"><input type="checkbox" id="e8"><label for="e8">May dilaw na warning sa DNS Options → <strong>Next</strong> lang.</label></li>
+    <li class="step"><input type="checkbox" id="e9"><label for="e9">Hintayin lumabas ang <code>KTG</code> sa NetBIOS name → <strong>Next</strong> → <strong>Next</strong> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="e10"><label for="e10">Kapag may berdeng check na “All prerequisite checks passed” → <strong>Install</strong> <span class="where">(baba)</span>. Kusa itong magre-restart.</label></li>
+    <li class="step"><input type="checkbox" id="e11"><label for="e11"><strong>Right Ctrl + Delete</strong> → password → Enter. Naka-login ka na bilang <code>KTG\Administrator</code>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sF" data-sec>
+  <div class="sec-head"><h2>F. Gumawa ng user</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="f1"><label for="f1">Server Manager → <strong>Tools</strong> <span class="where">(kanang taas)</span> → <strong>Active Directory Users and Computers</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="f2"><label for="f2">I-click ang maliit na arrow sa tabi ng <strong>ktg.local</strong> <span class="where">(kaliwang panel)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="f3"><label for="f3">Right-click <strong>Users</strong> → <strong>New</strong> → <strong>User</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="f4"><label for="f4">First name: <code>Kindson</code>. User logon name: <code>kindson</code> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="f5"><label for="f5">Password sa dalawang field → i-uncheck ang <strong>User must change password at next logon</strong> <span class="where">(unang checkbox)</span> → <strong>Next</strong> → <strong>Finish</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="f6"><label for="f6">Right-click <strong>Kindson</strong> <span class="where">(listahan sa kanan)</span> → <strong>Add to a group</strong> → i-type ang <code>Domain Admins</code> → <strong>Check Names</strong> <span class="where">(kanan ng field)</span> → <strong>OK</strong> → <strong>OK</strong>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sG" data-sec>
+  <div class="sec-head"><h2>G. Gumawa at i-install ang client</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="g1"><label for="g1">VirtualBox → <strong>New</strong> → Name: <code>Win11Client</code> → ISO Image: Windows 11 ISO → i-check ang <strong>Skip Unattended Installation</strong> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g2"><label for="g2">Base Memory: 4096 MB → <strong>Next</strong> → hard disk: iwanan ang default → <strong>Next</strong> → <strong>Finish</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g3"><label for="g3"><strong>Start</strong> → <strong>Next</strong> → <strong>Install now</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g4"><label for="g4">Kung humingi ng product key: <strong>I don’t have a product key</strong> <span class="where">(baba)</span>. Piliin ang Pro o Enterprise, hindi Home → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g5"><label for="g5"><strong>I accept</strong> → <strong>Next</strong> → <strong>Custom</strong> → <strong>Drive 0</strong> → <strong>Next</strong>. Hintayin matapos.</label></li>
+    <li class="step"><input type="checkbox" id="g6"><label for="g6">Philippines → <strong>Yes</strong>. Keyboard → <strong>Yes</strong>. Second keyboard → <strong>Skip</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g7"><label for="g7">Kung itanong ang “How would you like to set up this device?” → <strong>Set up for work or school</strong> → <strong>Next</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="g8"><label for="g8"><strong>Sign-in options</strong> <span class="where">(ilalim ng email field)</span> → <strong>Domain join instead</strong>. Sa Windows 10, nasa baba, kaliwa ang Domain join instead.</label></li>
+    <li class="step"><input type="checkbox" id="g9"><label for="g9">Pangalan (halimbawa <code>student</code>) → password → tatlong security question → <strong>Accept</strong> sa privacy screens.</label></li>
+    <li class="step"><input type="checkbox" id="g10"><label for="g10">I-install ang Guest Additions gaya ng B10 at B11.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sH" data-sec>
+  <div class="sec-head"><h2>H. Network at IP ng client</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="h1"><label for="h1">I-shut down ang client → VirtualBox: Win11Client → <strong>Settings</strong> → <strong>Network</strong> → Adapter 1: <strong>Internal Network</strong> → Name: <code>intnet</code> → <strong>OK</strong> → <strong>Start</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="h2"><label for="h2"><strong>Windows key + R</strong> → <code>ncpa.cpl</code> → right-click <strong>Ethernet</strong> → <strong>Properties</strong> → <strong>Internet Protocol Version 4 (TCP/IPv4)</strong> → <strong>Properties</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="h3"><label for="h3"><strong>Use the following IP address</strong> → IP address: <code>192.168.10.20</code> → i-click ang Subnet mask para lumabas ang <code>255.255.255.0</code> → blangko ang gateway.</label></li>
+    <li class="step"><input type="checkbox" id="h4"><label for="h4">Preferred DNS server: <code>192.168.10.10</code> → <strong>OK</strong> → <strong>Close</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="h5"><label for="h5"><strong>Windows key + R</strong> → <code>firewall.cpl</code> → <strong>Turn Windows Defender Firewall on or off</strong> → <strong>Turn off</strong> sa tatlo → <strong>OK</strong>.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sI" data-sec>
+  <div class="sec-head"><h2>I. I-join ang client sa domain</h2><span class="sec-count"></span></div>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="i1"><label for="i1">Start → i-type ang <code>cmd</code> → Enter.</label></li>
+    <li class="step"><input type="checkbox" id="i2"><label for="i2">I-type ang <code>ping 192.168.10.10</code> → Enter. Dapat may “Reply from.”</label></li>
+    <li class="step"><input type="checkbox" id="i3"><label for="i3">I-type ang <code>nslookup ktg.local</code> → Enter. Dapat lumabas ang 192.168.10.10.</label></li>
+    <li class="step"><input type="checkbox" id="i4"><label for="i4"><strong>Windows key + R</strong> → <code>sysdm.cpl</code> → <strong>OK</strong> → <strong>Change</strong> <span class="where">(kanan, gitna)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="i5"><label for="i5">Computer name <span class="where">(taas)</span>: <code>Win11Client</code>.</label></li>
+    <li class="step"><input type="checkbox" id="i6"><label for="i6">Member of <span class="where">(baba)</span>: i-click ang <strong>Domain</strong> → i-type ang <code>ktg.local</code> → <strong>OK</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="i7"><label for="i7">Sa popup: <code>KTG\kindson</code> at ang password → <strong>OK</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="i8"><label for="i8">“Welcome to the ktg.local domain.” → <strong>OK</strong> → <strong>OK</strong> → <strong>Close</strong> → <strong>Restart Now</strong>.</label></li>
+    <li class="step"><input type="checkbox" id="i9"><label for="i9">Login screen: <strong>Other user</strong> <span class="where">(baba, kaliwa)</span> → <code>KTG\kindson</code> → password → Enter.</label></li>
+    <li class="step"><input type="checkbox" id="i10"><label for="i10">Sa server: Active Directory Users and Computers → <strong>Computers</strong> <span class="where">(kaliwa)</span>. Dapat nasa kanan ang WIN11CLIENT. I-screenshot.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sJ" data-sec>
+  <div class="sec-head"><h2>J. Magdagdag ng isa pang client</h2><span class="sec-count"></span></div>
+  <p class="note">Iba dapat ang pangalan at IP ng bawat client. Pareho ang DNS: 192.168.10.10.</p>
+  <ol class="steps">
+    <li class="step"><input type="checkbox" id="j1"><label for="j1">Kung 8 GB lang ang RAM ng lab PC: i-shut down muna ang Win11Client <span class="where">(Start → Power → Shut down)</span>.</label></li>
+    <li class="step"><input type="checkbox" id="j2"><label for="j2">Optional: sa server, gumawa ng bagong user para sa client 2. Ulitin ang F3 hanggang F5, halimbawa <code>student2</code>.</label></li>
+    <li class="step"><input type="checkbox" id="j3"><label for="j3">Ulitin ang G1 hanggang G10, pero Name: <code>Win11Client2</code>.</label></li>
+    <li class="step"><input type="checkbox" id="j4"><label for="j4">Ulitin ang H1 hanggang H5, pero IP address: <code>192.168.10.21</code>.</label></li>
+    <li class="step"><input type="checkbox" id="j5"><label for="j5">Ulitin ang I1 hanggang I8, pero Computer name: <code>Win11Client2</code>.</label></li>
+    <li class="step"><input type="checkbox" id="j6"><label for="j6">Login screen: <strong>Other user</strong> → <code>KTG\kindson</code> o <code>KTG\student2</code> → password → Enter.</label></li>
+    <li class="step"><input type="checkbox" id="j7"><label for="j7">Sa server: <strong>Computers</strong>. Dapat nandoon na ang WIN11CLIENT at WIN11CLIENT2. I-screenshot.</label></li>
+  </ol>
+</section>
+
+<section class="sec" id="sErr">
+  <div class="sec-head"><h2>Kung may error</h2></div>
+  <div class="err-box">
+    <details class="err"><summary>“An Active Directory Domain Controller (AD DC) for the domain could not be contacted”</summary><div class="body"><p>I-check na <code>192.168.10.10</code> ang Preferred DNS ng client, at parehong <code>intnet</code> ang network ng server at client.</p></div></details>
+    <details class="err"><summary>Walang “Reply from” sa ping</summary><div class="body"><p>I-off ang firewall sa server at sa client. I-check ang IP ng dalawa sa <code>ncpa.cpl</code>.</p></div></details>
+    <details class="err"><summary>“The user name or password is incorrect” sa pag-join</summary><div class="body"><p>I-type bilang <code>KTG\kindson</code>, at i-check ang Caps Lock.</p></div></details>
+    <details class="err"><summary>May error na duplicate name o IP sa client 2</summary><div class="body"><p>Gamitin ang <code>Win11Client2</code> at <code>192.168.10.21</code>, hindi ang kapareho ng client 1.</p></div></details>
+    <details class="err"><summary>Walang 64-bit na Windows sa Version</summary><div class="body"><p>Sabihan ang teacher o lab in-charge. Naka-disable ang virtualization sa BIOS.</p></div></details>
+    <details class="err"><summary>“This PC can’t run Windows 11”</summary><div class="body"><p>Gawing 4096 MB ang Base Memory, at siguraduhing Windows 11 (64-bit) ang Version.</p></div></details>
+    <details class="err"><summary>Ayaw gumana ng Ctrl + Alt + Del</summary><div class="body"><p>Pindutin ang <strong>Right Ctrl + Delete</strong>, o <strong>Input</strong> → <strong>Keyboard</strong> → <strong>Insert Ctrl-Alt-Del</strong> sa menu ng VM window.</p></div></details>
+  </div>
+</section>
+
+</main>
+
+<div class="wrap">
+  <footer>
+    <p><a href="simulator.html">Panoorin ang simulation ng mga screen</a></p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  function $(s) { return document.querySelector(s); }
+  function $all(s) { return Array.prototype.slice.call(document.querySelectorAll(s)); }
+  var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  /* Checklist */
+  var KEY = "server-client-steps-v1";
+  var boxes = $all(".step input[type=checkbox]");
+  var sections = $all("[data-sec]");
+  var bar = $("#progressBar");
+  var progressLabel = $("#progressLabel");
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+
+  function saveProgress() {
+    var state = {};
+    boxes.forEach(function (b) { if (b.checked) { state[b.id] = true; } });
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+  }
+  function updateProgress() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    bar.style.width = (boxes.length ? (done / boxes.length) * 100 : 0) + "%";
+    progressLabel.textContent = done === boxes.length
+      ? "Tapos na ang lahat ng " + boxes.length + " steps."
+      : done + " sa " + boxes.length + " tapos na";
+    sections.forEach(function (sec) {
+      var list = Array.prototype.slice.call(sec.querySelectorAll(".step input[type=checkbox]"));
+      var d = list.filter(function (b) { return b.checked; }).length;
+      var out = sec.querySelector(".sec-count");
+      out.textContent = d === list.length ? "✓ " + d + "/" + list.length : d + "/" + list.length;
+      out.classList.toggle("done", d === list.length);
+    });
+  }
+  boxes.forEach(function (b) {
+    if (saved[b.id]) { b.checked = true; }
+    b.addEventListener("change", function () { saveProgress(); updateProgress(); });
+  });
+  $("#progressReset").addEventListener("click", function () {
+    boxes.forEach(function (b) { b.checked = false; });
+    saveProgress();
+    updateProgress();
+  });
+  $("#nextStep").addEventListener("click", function () {
+    var next = boxes.filter(function (b) { return !b.checked; })[0];
+    if (!next) { return; }
+    var li = next.closest(".step");
+    li.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    li.classList.add("flash");
+    setTimeout(function () { li.classList.remove("flash"); }, 1600);
+  });
+  updateProgress();
+
+  /* Section chips */
+  var chipsBox = $("#chips");
+  var chips = $all(".chip");
+  var chipFor = {};
+  chips.forEach(function (c) { chipFor[c.getAttribute("href").slice(1)] = c; });
+  function setCurrent(id) {
+    var current = chipFor[id];
+    if (!current) { return; }
+    chips.forEach(function (c) {
+      if (c === current) { c.setAttribute("aria-current", "true"); } else { c.removeAttribute("aria-current"); }
+    });
+    if (typeof chipsBox.scrollTo === "function") {
+      chipsBox.scrollTo({ left: Math.max(0, current.offsetLeft - 12), behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { setCurrent(en.target.id); } });
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    Object.keys(chipFor).forEach(function (id) {
+      var sec = document.getElementById(id);
+      if (sec) { io.observe(sec); }
+    });
+  }
+})();
+</script>
+</body>
+</html>
